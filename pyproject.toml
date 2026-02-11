@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "ccmonitor"
+version = "0.1.0"
+description = "TUI for real-time monitoring of Claude Code context and usage limits"
+requires-python = ">=3.10"
+dependencies = [
+    "textual>=1.0.0",
+    "rich>=13.0.0",
+]
+
+[project.scripts]
+ccmonitor = "ccmonitor.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
