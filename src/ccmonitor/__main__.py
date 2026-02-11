@@ -28,8 +28,17 @@ def main() -> None:
         action="store_true",
         help="Print a one-time usage snapshot to stdout instead of launching TUI",
     )
+    parser.add_argument(
+        "--check-token",
+        action="store_true",
+        help="Debug OAuth token discovery and exit",
+    )
 
     args = parser.parse_args()
+
+    if args.check_token:
+        _check_token()
+        return
 
     if args.snapshot:
         _print_snapshot(args.claude_dir)
@@ -42,6 +51,52 @@ def main() -> None:
         refresh_interval=args.refresh,
     )
     app.run()
+
+
+def _check_token() -> None:
+    """Debug OAuth token discovery."""
+    import json
+    import os
+    from pathlib import Path as P
+    from ccmonitor.collector import _find_oauth_token, _call_usage_api
+
+    print("=== OAuth Token Discovery Debug ===\n")
+
+    config_dir = os.environ.get("CLAUDE_CONFIG_DIR") or str(P.home() / ".claude")
+    creds_path = P(config_dir) / ".credentials.json"
+    print(f"Home directory:     {P.home()}")
+    print(f"Config directory:   {config_dir}")
+    print(f"Credentials path:   {creds_path}")
+    print(f"Credentials exists: {creds_path.exists()}")
+
+    if creds_path.exists():
+        import json
+        try:
+            creds = json.loads(creds_path.read_text())
+            print(f"Credentials keys:   {list(creds.keys())}")
+            for key in ("accessToken", "access_token", "refreshToken", "refresh_token"):
+                val = creds.get(key)
+                if val:
+                    print(f"  {key}: {val[:20]}...({len(val)} chars)")
+                else:
+                    print(f"  {key}: not present")
+        except Exception as e:
+            print(f"Error reading credentials: {e}")
+
+    print()
+    token, diag = _find_oauth_token()
+    if token:
+        print(f"Token found: {token[:20]}...({len(token)} chars)")
+        print("\nTesting API call...")
+        result = _call_usage_api(token)
+        import urllib.error
+        if isinstance(result, urllib.error.HTTPError):
+            print(f"API error: {result.code} {result.reason}")
+        else:
+            print(f"API success: {json.dumps(result, indent=2)}")
+    else:
+        print(f"No token found.")
+        print(f"Diagnostics: {diag}")
 
 
 def _print_snapshot(claude_dir: Path | None) -> None:
@@ -130,6 +185,8 @@ def _print_snapshot(claude_dir: Path | None) -> None:
                 )
 
         console.print(plan_table)
+    elif plan.error:
+        console.print(f"[dim]Plan Usage: {plan.error}[/dim]")
 
     console.print()
 
