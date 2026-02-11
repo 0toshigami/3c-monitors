@@ -16,13 +16,12 @@ class ContextGauge(Widget):
     DEFAULT_CSS = """
     ContextGauge {
         height: auto;
-        padding: 1 2;
+        padding: 0 2;
     }
 
     ContextGauge .gauge-title {
         text-style: bold;
         color: $text;
-        margin-bottom: 1;
     }
 
     ContextGauge .gauge-bar {
@@ -31,7 +30,6 @@ class ContextGauge(Widget):
 
     ContextGauge .gauge-details {
         color: $text-muted;
-        margin-top: 1;
     }
 
     ContextGauge .gauge-warning {

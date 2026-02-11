@@ -19,13 +19,12 @@ class RateMonitor(Widget):
     DEFAULT_CSS = """
     RateMonitor {
         height: auto;
-        padding: 1 2;
+        padding: 0 2;
     }
 
     RateMonitor .rate-title {
         text-style: bold;
         color: $text;
-        margin-bottom: 1;
     }
 
     RateMonitor .rate-ok {
@@ -42,7 +41,6 @@ class RateMonitor(Widget):
 
     RateMonitor .rate-details {
         color: $text-muted;
-        margin-top: 1;
     }
     """
 
