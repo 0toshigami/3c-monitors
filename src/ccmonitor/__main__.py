@@ -3,11 +3,46 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 
+_REQUIRED_PACKAGES = {"textual": "textual>=1.0.0", "rich": "rich>=13.0.0"}
+
+
+def _check_deps() -> None:
+    """Check for required dependencies and offer to install them."""
+    missing = []
+    for module, pkg in _REQUIRED_PACKAGES.items():
+        try:
+            __import__(module)
+        except ImportError:
+            missing.append(pkg)
+
+    if not missing:
+        return
+
+    print(f"Missing dependencies: {', '.join(missing)}")
+    print()
+    install_cmd = [sys.executable, "-m", "pip", "install"] + missing
+    print(f"Install with:\n  {' '.join(install_cmd)}")
+    print()
+
+    try:
+        answer = input("Install now? [Y/n] ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        sys.exit(1)
+
+    if answer in ("", "y", "yes"):
+        subprocess.check_call(install_cmd)
+        print()
+    else:
+        sys.exit(1)
+
 
 def main() -> None:
+    _check_deps()
     parser = argparse.ArgumentParser(
         prog="ccmonitor",
         description="TUI for real-time monitoring of Claude Code context and usage limits",
