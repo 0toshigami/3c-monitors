@@ -351,8 +351,10 @@ def _refresh_oauth_token(refresh_token: str, creds_path: Path) -> str | None:
     return access_token
 
 
-def _find_oauth_token() -> str | None:
+def _find_oauth_token() -> tuple[str | None, str]:
     """Find the Claude Code OAuth/session token.
+
+    Returns (token, diagnostic_message).
 
     Discovery order:
     1. CCMONITOR_OAUTH_TOKEN env var (explicit override)
@@ -361,18 +363,23 @@ def _find_oauth_token() -> str | None:
     4. ~/.claude/.credentials.json (local install — refresh if expired)
     5. Session ingress token files (remote/container environments)
     """
+    tried = []
+
     # 1. Explicit override
     explicit = os.environ.get("CCMONITOR_OAUTH_TOKEN")
     if explicit:
-        return explicit.strip()
+        return explicit.strip(), ""
+    tried.append("CCMONITOR_OAUTH_TOKEN not set")
 
     # 2. Token file env var (set by Claude Code for child processes)
     token_file = os.environ.get("CLAUDE_SESSION_INGRESS_TOKEN_FILE")
     if token_file:
         try:
-            return Path(token_file).read_text().strip()
-        except OSError:
-            pass
+            return Path(token_file).read_text().strip(), ""
+        except OSError as e:
+            tried.append(f"CLAUDE_SESSION_INGRESS_TOKEN_FILE={token_file}: {e}")
+    else:
+        tried.append("CLAUDE_SESSION_INGRESS_TOKEN_FILE not set")
 
     # 3. File descriptor (set by Claude Code process)
     fd_str = os.environ.get("CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR")
@@ -382,9 +389,12 @@ def _find_oauth_token() -> str | None:
             with os.fdopen(os.dup(fd), "r") as f:
                 token = f.read().strip()
                 if token:
-                    return token
-        except (ValueError, OSError):
-            pass
+                    return token, ""
+            tried.append(f"fd {fd}: empty")
+        except (ValueError, OSError) as e:
+            tried.append(f"fd {fd_str}: {e}")
+    else:
+        tried.append("CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR not set")
 
     # 4. Local credentials file (Linux/WSL plaintext storage)
     config_dir = os.environ.get("CLAUDE_CONFIG_DIR") or str(Path.home() / ".claude")
@@ -394,13 +404,20 @@ def _find_oauth_token() -> str | None:
         # Try existing access token first
         access = creds.get("accessToken") or creds.get("access_token")
         if access:
-            return access
+            return access, ""
         # No access token — try refreshing
         refresh = creds.get("refreshToken") or creds.get("refresh_token")
         if refresh:
-            return _refresh_oauth_token(refresh, creds_path)
-    except (OSError, json.JSONDecodeError):
-        pass
+            refreshed = _refresh_oauth_token(refresh, creds_path)
+            if refreshed:
+                return refreshed, ""
+            tried.append(f"{creds_path}: refresh_token present but refresh failed")
+        else:
+            tried.append(f"{creds_path}: found file but no accessToken/access_token or refreshToken/refresh_token (keys: {list(creds.keys())})")
+    except json.JSONDecodeError as e:
+        tried.append(f"{creds_path}: invalid JSON: {e}")
+    except OSError as e:
+        tried.append(f"{creds_path}: {e}")
 
     # 5. Remote/container session ingress token files
     candidates = [
@@ -412,11 +429,13 @@ def _find_oauth_token() -> str | None:
         try:
             token = path.read_text().strip()
             if token:
-                return token
+                return token, ""
+            tried.append(f"{path}: empty")
         except OSError:
-            continue
+            tried.append(f"{path}: not found")
 
-    return None
+    diag = "Tried: " + "; ".join(tried)
+    return None, diag
 
 
 def _try_refresh_from_credentials() -> str | None:
@@ -459,12 +478,9 @@ def _call_usage_api(token: str) -> dict | urllib.error.HTTPError:
 
 def fetch_plan_usage() -> PlanUsage:
     """Fetch subscription plan usage from the Anthropic OAuth API."""
-    token = _find_oauth_token()
+    token, diag = _find_oauth_token()
     if not token:
-        return PlanUsage(
-            error="No OAuth token found — run 'claude login' first, "
-            "or set CCMONITOR_OAUTH_TOKEN"
-        )
+        return PlanUsage(error=f"No OAuth token found. {diag}")
 
     result = _call_usage_api(token)
 
