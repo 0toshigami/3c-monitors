@@ -15,7 +15,7 @@ class UsageTable(Widget):
 
     DEFAULT_CSS = """
     UsageTable {
-        height: auto;
+        height: 1fr;
         padding: 0 2;
     }
 
@@ -25,8 +25,7 @@ class UsageTable(Widget):
     }
 
     UsageTable DataTable {
-        height: auto;
-        max-height: 12;
+        height: 1fr;
     }
     """
 
