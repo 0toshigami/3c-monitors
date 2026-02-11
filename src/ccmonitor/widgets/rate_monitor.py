@@ -18,7 +18,7 @@ class RateMonitor(Widget):
 
     DEFAULT_CSS = """
     RateMonitor {
-        height: auto;
+        height: 1fr;
         padding: 0 2;
     }
 

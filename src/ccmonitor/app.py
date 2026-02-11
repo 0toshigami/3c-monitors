@@ -7,7 +7,7 @@ from pathlib import Path
 from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Vertical, VerticalScroll
+from textual.containers import Vertical
 from textual.message import Message
 from textual.screen import ModalScreen
 from textual.timer import Timer
@@ -132,17 +132,17 @@ class ClaudeCodeMonitor(App):
     }
 
     #plan-box {
-        height: auto;
+        height: 1fr;
         border-bottom: solid $primary;
     }
 
     #rate-box {
-        height: auto;
+        height: 1fr;
         border-bottom: solid $primary;
     }
 
     #cost-box {
-        height: auto;
+        height: 1fr;
     }
 
     #status-line {
@@ -195,7 +195,7 @@ class ClaudeCodeMonitor(App):
             with Vertical(id="spark-box"):
                 yield TokenSparkline(id="sparkline")
 
-        with VerticalScroll(id="sidebar-right"):
+        with Vertical(id="sidebar-right"):
             with Vertical(id="plan-box"):
                 yield PlanUsagePanel(id="plan-usage")
             with Vertical(id="rate-box"):

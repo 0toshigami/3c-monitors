@@ -15,7 +15,7 @@ class PlanUsagePanel(Widget):
 
     DEFAULT_CSS = """
     PlanUsagePanel {
-        height: auto;
+        height: 1fr;
         padding: 0 2;
     }
 
