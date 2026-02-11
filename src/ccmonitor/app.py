@@ -102,6 +102,7 @@ class ClaudeCodeMonitor(App):
 
     #main-area {
         row-span: 1;
+        border: solid $primary;
         height: 1fr;
     }
 
@@ -117,32 +118,30 @@ class ClaudeCodeMonitor(App):
     }
 
     #ctx-gauge-box {
-        border: solid $primary;
         height: auto;
+        border-bottom: solid $primary;
     }
 
     #usage-table-box {
-        border: solid $primary;
         height: auto;
+        border-bottom: solid $primary;
     }
 
     #spark-box {
-        border: solid $primary;
-        height: auto;
-    }
-
-    #rate-box {
-        border: solid $primary;
-        height: auto;
-    }
-
-    #cost-box {
-        border: solid $primary;
         height: auto;
     }
 
     #plan-box {
-        border: solid $primary;
+        height: auto;
+        border-bottom: solid $primary;
+    }
+
+    #rate-box {
+        height: auto;
+        border-bottom: solid $primary;
+    }
+
+    #cost-box {
         height: auto;
     }
 
