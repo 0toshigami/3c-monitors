@@ -15,7 +15,7 @@ class CostPanel(Widget):
 
     DEFAULT_CSS = """
     CostPanel {
-        height: auto;
+        height: 1fr;
         padding: 0 2;
     }
 
