@@ -120,7 +120,7 @@ class SessionList(Widget):
             if session.last_activity:
                 try:
                     dt = datetime.fromisoformat(session.last_activity)
-                    time_str = dt.strftime("%H:%M")
+                    time_str = dt.strftime("%m/%d/%y %H:%M")
                 except (ValueError, TypeError):
                     time_str = "?"
 
