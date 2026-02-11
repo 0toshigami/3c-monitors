@@ -15,7 +15,7 @@ class ContextGauge(Widget):
 
     DEFAULT_CSS = """
     ContextGauge {
-        height: auto;
+        height: 1fr;
         padding: 0 2;
     }
 

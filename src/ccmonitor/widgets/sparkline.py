@@ -18,7 +18,7 @@ class TokenSparkline(Widget):
 
     DEFAULT_CSS = """
     TokenSparkline {
-        height: auto;
+        height: 1fr;
         padding: 0 2;
     }
 

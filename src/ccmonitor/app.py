@@ -118,17 +118,17 @@ class ClaudeCodeMonitor(App):
     }
 
     #ctx-gauge-box {
-        height: auto;
+        height: 1fr;
         border-bottom: solid $primary;
     }
 
     #usage-table-box {
-        height: auto;
+        height: 1fr;
         border-bottom: solid $primary;
     }
 
     #spark-box {
-        height: auto;
+        height: 1fr;
     }
 
     #plan-box {
@@ -187,7 +187,7 @@ class ClaudeCodeMonitor(App):
         with Vertical(id="sidebar-left"):
             yield SessionList(id="session-list")
 
-        with VerticalScroll(id="main-area"):
+        with Vertical(id="main-area"):
             with Vertical(id="ctx-gauge-box"):
                 yield ContextGauge(id="ctx-gauge")
             with Vertical(id="usage-table-box"):
