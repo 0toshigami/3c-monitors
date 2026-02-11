@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+import functools
 import json
+import logging
 import os
 import time
-import urllib.request
 import urllib.error
 import urllib.parse
+import urllib.request
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 # Known context window sizes per model family
@@ -50,6 +54,12 @@ CACHE_PRICING = {
 }
 
 
+def _get_config_dir() -> Path:
+    """Return the Claude Code configuration directory."""
+    return Path(os.environ.get("CLAUDE_CONFIG_DIR") or str(Path.home() / ".claude"))
+
+
+@functools.lru_cache(maxsize=32)
 def _get_model_family(model_id: str) -> str:
     """Extract model family from a full model ID like 'claude-opus-4-6'."""
     for family in MODEL_CONTEXT_WINDOWS:
@@ -67,6 +77,7 @@ def _get_model_family(model_id: str) -> str:
 @dataclass
 class MessageStats:
     """Stats for a single API message."""
+
     timestamp: str
     model: str
     input_tokens: int = 0
@@ -79,6 +90,7 @@ class MessageStats:
 @dataclass
 class SessionData:
     """Aggregated data for a single session."""
+
     session_id: str
     project_path: str
     model: str = ""
@@ -129,8 +141,6 @@ class SessionData:
         try:
             first_ts = self.messages[0].timestamp
             last_ts = self.messages[-1].timestamp
-            # Timestamps are ISO format
-            from datetime import datetime
             t0 = datetime.fromisoformat(first_ts)
             t1 = datetime.fromisoformat(last_ts)
             elapsed_min = (t1 - t0).total_seconds() / 60
@@ -189,7 +199,7 @@ def parse_session(jsonl_path: Path) -> SessionData:
     )
 
     try:
-        with open(jsonl_path, "r") as f:
+        with open(jsonl_path) as f:
             for line in f:
                 line = line.strip()
                 if not line:
@@ -220,9 +230,7 @@ def parse_session(jsonl_path: Path) -> SessionData:
                     if model:
                         session.model = model
                         family = _get_model_family(model)
-                        session.context_window_size = MODEL_CONTEXT_WINDOWS.get(
-                            family, 200_000
-                        )
+                        session.context_window_size = MODEL_CONTEXT_WINDOWS.get(family, 200_000)
 
                     input_tokens = usage.get("input_tokens", 0)
                     output_tokens = usage.get("output_tokens", 0)
@@ -248,8 +256,8 @@ def parse_session(jsonl_path: Path) -> SessionData:
                         message_type=msg_type,
                     )
                     session.messages.append(stats)
-    except (OSError, PermissionError):
-        pass
+    except (OSError, PermissionError) as e:
+        logger.debug("Failed to read session file %s: %s", jsonl_path, e)
 
     return session
 
@@ -267,6 +275,7 @@ def collect_all_sessions(claude_dir: Path | None = None) -> list[SessionData]:
 @dataclass
 class UsageSummary:
     """Aggregate usage summary across sessions."""
+
     total_sessions: int = 0
     active_sessions: int = 0
     total_input_tokens: int = 0
@@ -285,6 +294,7 @@ class UsageSummary:
 @dataclass
 class PlanLimit:
     """A single plan usage limit."""
+
     label: str
     utilization: float  # percentage 0-100
     resets_at: str  # ISO timestamp
@@ -293,6 +303,7 @@ class PlanLimit:
 @dataclass
 class PlanUsage:
     """Subscription plan usage data from the OAuth API."""
+
     five_hour: PlanLimit | None = None
     seven_day: PlanLimit | None = None
     seven_day_sonnet: PlanLimit | None = None
@@ -310,11 +321,13 @@ _OAUTH_TOKEN_URL = "https://platform.claude.com/v1/oauth/token"
 
 def _refresh_oauth_token(refresh_token: str, creds_path: Path) -> str | None:
     """Use a refresh_token to obtain a fresh access_token, updating the credentials file."""
-    body = urllib.parse.urlencode({
-        "grant_type": "refresh_token",
-        "refresh_token": refresh_token,
-        "client_id": _OAUTH_CLIENT_ID,
-    }).encode()
+    body = urllib.parse.urlencode(
+        {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": _OAUTH_CLIENT_ID,
+        }
+    ).encode()
 
     req = urllib.request.Request(
         _OAUTH_TOKEN_URL,
@@ -397,8 +410,7 @@ def _find_oauth_token() -> tuple[str | None, str]:
         tried.append("CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR not set")
 
     # 4. Local credentials file (Linux/WSL plaintext storage)
-    config_dir = os.environ.get("CLAUDE_CONFIG_DIR") or str(Path.home() / ".claude")
-    creds_path = Path(config_dir) / ".credentials.json"
+    creds_path = _get_config_dir() / ".credentials.json"
     try:
         creds = json.loads(creds_path.read_text())
         claudeAiOauth = creds.get("claudeAiOauth", {})
@@ -414,7 +426,11 @@ def _find_oauth_token() -> tuple[str | None, str]:
                 return refreshed, ""
             tried.append(f"{creds_path}: refresh_token present but refresh failed")
         else:
-            tried.append(f"{creds_path}: found file but no accessToken/access_token or refreshToken/refresh_token (keys: {list(creds.keys())})")
+            keys = list(creds.keys())
+            tried.append(
+                f"{creds_path}: found file but no accessToken/access_token"
+                f" or refreshToken/refresh_token (keys: {keys})"
+            )
     except json.JSONDecodeError as e:
         tried.append(f"{creds_path}: invalid JSON: {e}")
     except OSError as e:
@@ -441,8 +457,7 @@ def _find_oauth_token() -> tuple[str | None, str]:
 
 def _try_refresh_from_credentials() -> str | None:
     """Attempt to refresh the token from the local credentials file."""
-    config_dir = os.environ.get("CLAUDE_CONFIG_DIR") or str(Path.home() / ".claude")
-    creds_path = Path(config_dir) / ".credentials.json"
+    creds_path = _get_config_dir() / ".credentials.json"
     try:
         creds = json.loads(creds_path.read_text())
         claudeAiOauth = creds.get("claudeAiOauth", {})

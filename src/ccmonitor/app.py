@@ -3,26 +3,70 @@
 from __future__ import annotations
 
 from pathlib import Path
+
+from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.containers import Vertical, VerticalScroll
+from textual.message import Message
+from textual.screen import ModalScreen
 from textual.timer import Timer
-from textual.widgets import Footer, Header, Static
+from textual.widgets import DataTable, Footer, Static
 
 from ccmonitor.collector import (
+    PlanUsage,
     SessionData,
     collect_all_sessions,
     fetch_plan_usage,
-    find_claude_dir,
     summarize_usage,
 )
 from ccmonitor.widgets.context_gauge import ContextGauge
 from ccmonitor.widgets.cost_panel import CostPanel
+from ccmonitor.widgets.plan_usage import PlanUsagePanel
 from ccmonitor.widgets.rate_monitor import RateMonitor
 from ccmonitor.widgets.session_list import SessionList
 from ccmonitor.widgets.sparkline import TokenSparkline
-from ccmonitor.widgets.plan_usage import PlanUsagePanel
 from ccmonitor.widgets.usage_table import UsageTable
+
+
+class HelpScreen(ModalScreen):
+    """Help overlay showing keybindings."""
+
+    BINDINGS = [  # noqa: RUF012
+        Binding("escape", "dismiss", "Close"),
+        Binding("question_mark", "dismiss", "Close"),
+    ]
+
+    DEFAULT_CSS = """
+    HelpScreen {
+        align: center middle;
+    }
+
+    HelpScreen > Static {
+        width: 50;
+        height: auto;
+        padding: 2 4;
+        border: thick $primary;
+        background: $surface;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        yield Static(
+            "[bold]Claude Code Monitor - Help[/bold]\n"
+            "\n"
+            "  [bold]Key         Action[/bold]\n"
+            "  q           Quit\n"
+            "  r           Refresh data now\n"
+            "  j / k       Navigate sessions\n"
+            "  d           Toggle dark/light mode\n"
+            "  ?           Show/close this help\n"
+            "  Esc         Close this overlay\n"
+            "\n"
+            "  [bold]Session Filter[/bold]\n"
+            "  Type in the filter box to search\n"
+            "  sessions by project name or model.\n"
+        )
 
 
 class ClaudeCodeMonitor(App):
@@ -111,13 +155,21 @@ class ClaudeCodeMonitor(App):
     }
     """
 
-    BINDINGS = [
+    BINDINGS = [  # noqa: RUF012
         Binding("q", "quit", "Quit"),
         Binding("r", "refresh", "Refresh"),
         Binding("j", "next_session", "Next Session"),
         Binding("k", "prev_session", "Prev Session"),
         Binding("d", "toggle_dark", "Toggle Dark"),
+        Binding("question_mark", "show_help", "Help"),
     ]
+
+    class PlanUsageLoaded(Message):
+        """Posted when plan usage data is fetched from background thread."""
+
+        def __init__(self, data: PlanUsage) -> None:
+            self.data = data
+            super().__init__()
 
     def __init__(self, claude_dir: Path | None = None, refresh_interval: float = 2.0):
         super().__init__()
@@ -157,20 +209,34 @@ class ClaudeCodeMonitor(App):
 
     def on_mount(self) -> None:
         self._load_data()
-        self._refresh_timer = self.set_interval(
-            self.refresh_interval, self._auto_refresh
-        )
+        self._refresh_timer = self.set_interval(self.refresh_interval, self._auto_refresh)
 
     def _auto_refresh(self) -> None:
         self._load_data()
 
     def _load_data(self) -> None:
         """Load/reload all session data and update widgets."""
+        # Remember selected session by ID so it survives reordering
+        selected_session_id = None
+        if self._sessions and self._selected_idx < len(self._sessions):
+            selected_session_id = self._sessions[self._selected_idx].session_id
+
         self._sessions = collect_all_sessions(self.claude_dir)
+
+        # Restore selection by session_id
+        if selected_session_id:
+            for i, s in enumerate(self._sessions):
+                if s.session_id == selected_session_id:
+                    self._selected_idx = i
+                    break
+
+        # Clamp index
+        if self._sessions:
+            self._selected_idx = min(self._selected_idx, len(self._sessions) - 1)
 
         # Update session list
         session_list = self.query_one("#session-list", SessionList)
-        session_list.update_sessions(self._sessions)
+        session_list.update_sessions(self._sessions, self._selected_idx)
 
         # Update summary
         summary = summarize_usage(self._sessions)
@@ -184,10 +250,8 @@ class ClaudeCodeMonitor(App):
         else:
             cost_panel.update_summary(summary)
 
-        # Update plan usage
-        plan_usage_panel = self.query_one("#plan-usage", PlanUsagePanel)
-        plan_data = fetch_plan_usage()
-        plan_usage_panel.update_usage(plan_data)
+        # Fetch plan usage in background (non-blocking)
+        self._fetch_plan_usage_async()
 
         # Update status line
         status = self.query_one("#status-line", Static)
@@ -238,11 +302,31 @@ class ClaudeCodeMonitor(App):
         if self._sessions:
             self._selected_idx = (self._selected_idx + 1) % len(self._sessions)
             self._update_session_view(self._sessions[self._selected_idx])
+            session_list = self.query_one("#session-list", SessionList)
+            table = session_list.query_one("#session-dt", DataTable)
+            table.move_cursor(row=self._selected_idx)
 
     def action_prev_session(self) -> None:
         if self._sessions:
             self._selected_idx = (self._selected_idx - 1) % len(self._sessions)
             self._update_session_view(self._sessions[self._selected_idx])
+            session_list = self.query_one("#session-list", SessionList)
+            table = session_list.query_one("#session-dt", DataTable)
+            table.move_cursor(row=self._selected_idx)
 
     def action_toggle_dark(self) -> None:
         self.theme = "textual-light" if self.theme == "textual-dark" else "textual-dark"
+
+    def action_show_help(self) -> None:
+        self.push_screen(HelpScreen())
+
+    @work(thread=True, exclusive=True, group="plan_usage")
+    def _fetch_plan_usage_async(self) -> None:
+        """Fetch plan usage in a background thread to avoid blocking the UI."""
+        plan_data = fetch_plan_usage()
+        self.post_message(self.PlanUsageLoaded(plan_data))
+
+    def on_claude_code_monitor_plan_usage_loaded(self, event: PlanUsageLoaded) -> None:
+        """Handle plan usage data arriving from background thread."""
+        plan_usage_panel = self.query_one("#plan-usage", PlanUsagePanel)
+        plan_usage_panel.update_usage(event.data)

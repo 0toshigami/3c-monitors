@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from textual.app import ComposeResult
 from textual.containers import Vertical
+from textual.css.query import NoMatches
 from textual.reactive import reactive
 from textual.widget import Widget
 from textual.widgets import Label, ProgressBar, Static
@@ -67,7 +68,7 @@ class ContextGauge(Widget):
         try:
             bar = self.query_one("#ctx-bar", ProgressBar)
             details = self.query_one("#ctx-details", Static)
-        except Exception:
+        except NoMatches:
             return
 
         pct = (self.context_used / self.context_total * 100) if self.context_total > 0 else 0

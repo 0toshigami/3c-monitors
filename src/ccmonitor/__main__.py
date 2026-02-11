@@ -56,21 +56,20 @@ def main() -> None:
 def _check_token() -> None:
     """Debug OAuth token discovery."""
     import json
-    import os
     from pathlib import Path as P
-    from ccmonitor.collector import _find_oauth_token, _call_usage_api
+
+    from ccmonitor.collector import _call_usage_api, _find_oauth_token, _get_config_dir
 
     print("=== OAuth Token Discovery Debug ===\n")
 
-    config_dir = os.environ.get("CLAUDE_CONFIG_DIR") or str(P.home() / ".claude")
-    creds_path = P(config_dir) / ".credentials.json"
+    config_dir = _get_config_dir()
+    creds_path = config_dir / ".credentials.json"
     print(f"Home directory:     {P.home()}")
     print(f"Config directory:   {config_dir}")
     print(f"Credentials path:   {creds_path}")
     print(f"Credentials exists: {creds_path.exists()}")
 
     if creds_path.exists():
-        import json
         try:
             creds = json.loads(creds_path.read_text())
             print(f"Credentials keys:   {list(creds.keys())}")
@@ -80,7 +79,7 @@ def _check_token() -> None:
                     print(f"  {key}: {val[:20]}...({len(val)} chars)")
                 else:
                     print(f"  {key}: not present")
-        except Exception as e:
+        except (OSError, json.JSONDecodeError) as e:
             print(f"Error reading credentials: {e}")
 
     print()
@@ -90,22 +89,28 @@ def _check_token() -> None:
         print("\nTesting API call...")
         result = _call_usage_api(token)
         import urllib.error
+
         if isinstance(result, urllib.error.HTTPError):
             print(f"API error: {result.code} {result.reason}")
         else:
             print(f"API success: {json.dumps(result, indent=2)}")
     else:
-        print(f"No token found.")
+        print("No token found.")
         print(f"Diagnostics: {diag}")
 
 
 def _print_snapshot(claude_dir: Path | None) -> None:
     """Print a text-based snapshot of current usage."""
     from rich.console import Console
-    from rich.table import Table
     from rich.panel import Panel
+    from rich.table import Table
 
-    from ccmonitor.collector import collect_all_sessions, fetch_plan_usage, format_reset_time, summarize_usage
+    from ccmonitor.collector import (
+        collect_all_sessions,
+        fetch_plan_usage,
+        format_reset_time,
+        summarize_usage,
+    )
 
     console = Console()
     sessions = collect_all_sessions(claude_dir)
@@ -177,7 +182,13 @@ def _print_snapshot(claude_dir: Path | None) -> None:
 
         for limit in [plan.five_hour, plan.seven_day, plan.seven_day_sonnet, plan.seven_day_opus]:
             if limit is not None:
-                style = "green" if limit.utilization < 50 else "yellow" if limit.utilization < 80 else "red"
+                style = (
+                    "green"
+                    if limit.utilization < 50
+                    else "yellow"
+                    if limit.utilization < 80
+                    else "red"
+                )
                 plan_table.add_row(
                     limit.label,
                     f"[{style}]{limit.utilization:.0f}%[/{style}]",

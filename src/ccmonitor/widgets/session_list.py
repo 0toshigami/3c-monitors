@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import time
 from datetime import datetime
+
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.message import Message
 from textual.widget import Widget
-from textual.widgets import DataTable, Label
+from textual.widgets import DataTable, Input, Label
 
 from ccmonitor.collector import SessionData
 
@@ -27,6 +29,11 @@ class SessionList(Widget):
         margin-bottom: 1;
     }
 
+    SessionList Input {
+        height: 3;
+        margin-bottom: 1;
+    }
+
     SessionList DataTable {
         height: 1fr;
     }
@@ -34,6 +41,7 @@ class SessionList(Widget):
 
     class SessionSelected(Message):
         """Emitted when a session is selected."""
+
         def __init__(self, index: int) -> None:
             self.index = index
             super().__init__()
@@ -41,24 +49,43 @@ class SessionList(Widget):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self._sessions: list[SessionData] = []
+        self._filter_query: str = ""
 
     def compose(self) -> ComposeResult:
         with Vertical():
-            yield Label("Sessions", classes="session-title")
+            yield Label("Sessions (* = active)", classes="session-title")
+            yield Input(placeholder="Filter sessions...", id="session-filter")
             yield DataTable(id="session-dt")
 
     def on_mount(self) -> None:
         table = self.query_one("#session-dt", DataTable)
-        table.add_columns("Project", "Model", "Messages", "Tokens", "Time")
+        table.add_columns("Project", "Model", "Msgs", "Tokens", "Cost", "Time")
         table.cursor_type = "row"
         table.zebra_stripes = True
 
-    def update_sessions(self, sessions: list[SessionData]) -> None:
+    def update_sessions(self, sessions: list[SessionData], selected_idx: int = 0) -> None:
         self._sessions = sessions
+        self._rebuild_table(selected_idx)
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Filter sessions as the user types."""
+        self._filter_query = event.value.lower()
+        self._rebuild_table()
+
+    def _rebuild_table(self, selected_idx: int = 0) -> None:
+        """Rebuild the session table, applying the current filter."""
         table = self.query_one("#session-dt", DataTable)
         table.clear()
 
-        for session in sessions:
+        now = time.time()
+        query = self._filter_query
+        for session in self._sessions:
+            # Apply filter
+            if query and (
+                query not in session.project_path.lower() and query not in session.model.lower()
+            ):
+                continue
+
             project = session.project_path
             if project.startswith("-"):
                 # Convert path format: -home-user-project -> ~/project
@@ -68,8 +95,13 @@ class SessionList(Widget):
                 else:
                     project = "/" + "/".join(parts)
             # Truncate
-            if len(project) > 20:
-                project = "..." + project[-17:]
+            if len(project) > 19:
+                project = "..." + project[-16:]
+
+            # Active session indicator
+            is_active = session.file_mtime and (now - session.file_mtime) < 3600
+            if is_active:
+                project = f"*{project}"
 
             model = session.model
             if model:
@@ -81,6 +113,9 @@ class SessionList(Widget):
             msg_count = str(session.message_count)
             tokens = _format_tokens(session.total_tokens)
 
+            cost = session.estimated_cost_usd
+            cost_str = f"${cost:.2f}" if cost >= 0.01 else f"${cost:.4f}"
+
             time_str = ""
             if session.last_activity:
                 try:
@@ -89,7 +124,11 @@ class SessionList(Widget):
                 except (ValueError, TypeError):
                     time_str = "?"
 
-            table.add_row(project, model, msg_count, tokens, time_str)
+            table.add_row(project, model, msg_count, tokens, cost_str, time_str)
+
+        # Restore cursor position after rebuild
+        if self._sessions and selected_idx < table.row_count:
+            table.move_cursor(row=selected_idx)
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         if event.cursor_row < len(self._sessions):

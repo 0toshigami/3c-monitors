@@ -68,7 +68,7 @@ class CostPanel(Widget):
         ]
 
         if session_cost > 0:
-            lines.append(f"")
+            lines.append("")
             lines.append(f"Session:   ${session_cost:.4f}")
 
         details.update("\n".join(lines))

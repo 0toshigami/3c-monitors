@@ -9,7 +9,6 @@ from textual.widgets import Label, Static
 
 from ccmonitor.collector import MessageStats
 
-
 # Unicode block characters for bar rendering
 BLOCKS = " ▁▂▃▄▅▆▇█"
 
@@ -43,6 +42,14 @@ class TokenSparkline(Widget):
     }
     """
 
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._chart_width: int = 60
+
+    def on_resize(self, event) -> None:
+        # Leave room for "  IN  " / "  OUT " prefix (6 chars) + padding (4 chars)
+        self._chart_width = max(10, event.size.width - 10)
+
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Label("Token Usage Over Time", classes="spark-title")
@@ -50,7 +57,8 @@ class TokenSparkline(Widget):
             yield Static("", id="spark-output", classes="spark-output")
             yield Static("", id="spark-legend", classes="spark-legend")
 
-    def update_data(self, messages: list[MessageStats], width: int = 60) -> None:
+    def update_data(self, messages: list[MessageStats], width: int | None = None) -> None:
+        width = width if width is not None else self._chart_width
         input_label = self.query_one("#spark-input", Static)
         output_label = self.query_one("#spark-output", Static)
         legend = self.query_one("#spark-legend", Static)
@@ -62,7 +70,9 @@ class TokenSparkline(Widget):
             return
 
         # Get input and output token sequences
-        input_vals = [m.input_tokens + m.cache_creation_tokens + m.cache_read_tokens for m in messages]
+        input_vals = [
+            m.input_tokens + m.cache_creation_tokens + m.cache_read_tokens for m in messages
+        ]
         output_vals = [m.output_tokens for m in messages]
 
         # Downsample if needed
