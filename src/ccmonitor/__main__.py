@@ -50,7 +50,7 @@ def _print_snapshot(claude_dir: Path | None) -> None:
     from rich.table import Table
     from rich.panel import Panel
 
-    from ccmonitor.collector import collect_all_sessions, summarize_usage
+    from ccmonitor.collector import collect_all_sessions, fetch_plan_usage, format_reset_time, summarize_usage
 
     console = Console()
     sessions = collect_all_sessions(claude_dir)
@@ -111,6 +111,25 @@ def _print_snapshot(claude_dir: Path | None) -> None:
             )
 
         console.print(session_table)
+
+    # Plan usage
+    plan = fetch_plan_usage()
+    if plan.available:
+        plan_table = Table(title="Plan Usage", show_lines=True)
+        plan_table.add_column("Limit", style="cyan")
+        plan_table.add_column("Usage", justify="right")
+        plan_table.add_column("Resets In", style="yellow")
+
+        for limit in [plan.five_hour, plan.seven_day, plan.seven_day_sonnet, plan.seven_day_opus]:
+            if limit is not None:
+                style = "green" if limit.utilization < 50 else "yellow" if limit.utilization < 80 else "red"
+                plan_table.add_row(
+                    limit.label,
+                    f"[{style}]{limit.utilization:.0f}%[/{style}]",
+                    format_reset_time(limit.resets_at),
+                )
+
+        console.print(plan_table)
 
     console.print()
 

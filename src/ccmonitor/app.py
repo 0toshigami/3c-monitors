@@ -12,6 +12,7 @@ from textual.widgets import Footer, Header, Static
 from ccmonitor.collector import (
     SessionData,
     collect_all_sessions,
+    fetch_plan_usage,
     find_claude_dir,
     summarize_usage,
 )
@@ -20,6 +21,7 @@ from ccmonitor.widgets.cost_panel import CostPanel
 from ccmonitor.widgets.rate_monitor import RateMonitor
 from ccmonitor.widgets.session_list import SessionList
 from ccmonitor.widgets.sparkline import TokenSparkline
+from ccmonitor.widgets.plan_usage import PlanUsagePanel
 from ccmonitor.widgets.usage_table import UsageTable
 
 
@@ -95,6 +97,11 @@ class ClaudeCodeMonitor(App):
         height: auto;
     }
 
+    #plan-box {
+        border: solid $primary;
+        height: auto;
+    }
+
     #status-line {
         dock: bottom;
         height: 1;
@@ -138,6 +145,8 @@ class ClaudeCodeMonitor(App):
                 yield TokenSparkline(id="sparkline")
 
         with VerticalScroll(id="sidebar-right"):
+            with Vertical(id="plan-box"):
+                yield PlanUsagePanel(id="plan-usage")
             with Vertical(id="rate-box"):
                 yield RateMonitor(id="rate-monitor")
             with Vertical(id="cost-box"):
@@ -174,6 +183,11 @@ class ClaudeCodeMonitor(App):
             cost_panel.update_summary(summary, session.estimated_cost_usd)
         else:
             cost_panel.update_summary(summary)
+
+        # Update plan usage
+        plan_usage_panel = self.query_one("#plan-usage", PlanUsagePanel)
+        plan_data = fetch_plan_usage()
+        plan_usage_panel.update_usage(plan_data)
 
         # Update status line
         status = self.query_one("#status-line", Static)

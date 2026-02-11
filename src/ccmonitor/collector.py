@@ -5,7 +5,10 @@ from __future__ import annotations
 import json
 import os
 import time
+import urllib.request
+import urllib.error
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -276,6 +279,136 @@ class UsageSummary:
     @property
     def total_tokens(self) -> int:
         return self.total_input_tokens + self.total_output_tokens
+
+
+@dataclass
+class PlanLimit:
+    """A single plan usage limit."""
+    label: str
+    utilization: float  # percentage 0-100
+    resets_at: str  # ISO timestamp
+
+
+@dataclass
+class PlanUsage:
+    """Subscription plan usage data from the OAuth API."""
+    five_hour: PlanLimit | None = None
+    seven_day: PlanLimit | None = None
+    seven_day_sonnet: PlanLimit | None = None
+    seven_day_opus: PlanLimit | None = None
+    error: str = ""
+
+    @property
+    def available(self) -> bool:
+        return self.five_hour is not None or self.seven_day is not None
+
+
+def _find_oauth_token() -> str | None:
+    """Find the Claude Code OAuth/session token."""
+    # 1. Check env var pointing to token file
+    token_file = os.environ.get("CLAUDE_SESSION_INGRESS_TOKEN_FILE")
+    if token_file:
+        try:
+            return Path(token_file).read_text().strip()
+        except OSError:
+            pass
+
+    # 2. Check common file locations
+    candidates = [
+        Path.home() / ".claude" / "remote" / ".session_ingress_token",
+        Path("/home/claude/.claude/remote/.session_ingress_token"),
+        Path("/root/.claude/remote/.session_ingress_token"),
+    ]
+    for path in candidates:
+        try:
+            token = path.read_text().strip()
+            if token:
+                return token
+        except OSError:
+            continue
+
+    return None
+
+
+def fetch_plan_usage() -> PlanUsage:
+    """Fetch subscription plan usage from the Anthropic OAuth API."""
+    token = _find_oauth_token()
+    if not token:
+        return PlanUsage(error="No OAuth token found")
+
+    base_url = os.environ.get("ANTHROPIC_BASE_URL", "https://api.anthropic.com")
+    url = f"{base_url}/api/oauth/usage"
+
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+            "anthropic-beta": "oauth-2025-04-20",
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError) as e:
+        return PlanUsage(error=str(e))
+
+    result = PlanUsage()
+
+    if data.get("five_hour"):
+        result.five_hour = PlanLimit(
+            label="5-Hour Session",
+            utilization=data["five_hour"].get("utilization", 0),
+            resets_at=data["five_hour"].get("resets_at", ""),
+        )
+
+    if data.get("seven_day"):
+        result.seven_day = PlanLimit(
+            label="Weekly (All Models)",
+            utilization=data["seven_day"].get("utilization", 0),
+            resets_at=data["seven_day"].get("resets_at", ""),
+        )
+
+    if data.get("seven_day_sonnet"):
+        result.seven_day_sonnet = PlanLimit(
+            label="Weekly (Sonnet)",
+            utilization=data["seven_day_sonnet"].get("utilization", 0),
+            resets_at=data["seven_day_sonnet"].get("resets_at", ""),
+        )
+
+    if data.get("seven_day_opus"):
+        result.seven_day_opus = PlanLimit(
+            label="Weekly (Opus)",
+            utilization=data["seven_day_opus"].get("utilization", 0),
+            resets_at=data["seven_day_opus"].get("resets_at", ""),
+        )
+
+    return result
+
+
+def format_reset_time(resets_at: str) -> str:
+    """Format a reset timestamp into a human-readable string."""
+    if not resets_at:
+        return ""
+    try:
+        reset_dt = datetime.fromisoformat(resets_at)
+        now = datetime.now(timezone.utc)
+        delta = reset_dt - now
+        total_seconds = int(delta.total_seconds())
+        if total_seconds <= 0:
+            return "resetting..."
+        days = total_seconds // 86400
+        hours = (total_seconds % 86400) // 3600
+        minutes = (total_seconds % 3600) // 60
+        if days > 0:
+            return f"{days}d {hours}h"
+        if hours > 0:
+            return f"{hours}h {minutes}m"
+        return f"{minutes}m"
+    except (ValueError, TypeError):
+        return ""
 
 
 def summarize_usage(sessions: list[SessionData]) -> UsageSummary:
