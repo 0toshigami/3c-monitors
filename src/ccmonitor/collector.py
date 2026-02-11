@@ -401,12 +401,13 @@ def _find_oauth_token() -> tuple[str | None, str]:
     creds_path = Path(config_dir) / ".credentials.json"
     try:
         creds = json.loads(creds_path.read_text())
+        claudeAiOauth = creds.get("claudeAiOauth", {})
         # Try existing access token first
-        access = creds.get("accessToken") or creds.get("access_token")
+        access = claudeAiOauth.get("accessToken") or claudeAiOauth.get("access_token")
         if access:
             return access, ""
         # No access token — try refreshing
-        refresh = creds.get("refreshToken") or creds.get("refresh_token")
+        refresh = claudeAiOauth.get("refreshToken") or claudeAiOauth.get("refresh_token")
         if refresh:
             refreshed = _refresh_oauth_token(refresh, creds_path)
             if refreshed:
@@ -444,7 +445,8 @@ def _try_refresh_from_credentials() -> str | None:
     creds_path = Path(config_dir) / ".credentials.json"
     try:
         creds = json.loads(creds_path.read_text())
-        refresh = creds.get("refreshToken") or creds.get("refresh_token")
+        claudeAiOauth = creds.get("claudeAiOauth", {})
+        refresh = claudeAiOauth.get("refreshToken") or claudeAiOauth.get("refresh_token")
         if refresh:
             return _refresh_oauth_token(refresh, creds_path)
     except (OSError, json.JSONDecodeError):
