@@ -116,13 +116,7 @@ class SessionList(Widget):
             cost = session.estimated_cost_usd
             cost_str = f"${cost:.2f}" if cost >= 0.01 else f"${cost:.4f}"
 
-            time_str = ""
-            if session.last_activity:
-                try:
-                    dt = datetime.fromisoformat(session.last_activity)
-                    time_str = dt.strftime("%m/%d/%y %H:%M")
-                except (ValueError, TypeError):
-                    time_str = "?"
+            time_str = _format_local_time(session.last_activity) if session.last_activity else ""
 
             table.add_row(project, model, msg_count, tokens, cost_str, time_str)
 
@@ -142,3 +136,16 @@ def _format_tokens(n: int) -> str:
     if n >= 1_000:
         return f"{n / 1_000:.1f}K"
     return str(n)
+
+
+def _format_local_time(iso_timestamp: str) -> str:
+    """Format an ISO 8601 timestamp as local time."""
+    try:
+        # Python 3.10 fromisoformat() doesn't handle 'Z' suffix
+        if iso_timestamp.endswith("Z"):
+            iso_timestamp = iso_timestamp[:-1] + "+00:00"
+        dt = datetime.fromisoformat(iso_timestamp)
+        dt = dt.astimezone()  # Convert to system local timezone
+        return dt.strftime("%Y-%m-%d %H:%M")
+    except (ValueError, TypeError, OSError):
+        return "?"
