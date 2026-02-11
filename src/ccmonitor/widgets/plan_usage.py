@@ -67,6 +67,10 @@ class PlanUsagePanel(Widget):
             yield ProgressBar(total=100, show_eta=False, show_percentage=True, id="plan-sonnet-bar")
             yield Static("", id="plan-sonnet-reset", classes="plan-reset")
 
+            yield Static("Weekly (Opus)", id="plan-opus-label", classes="plan-label")
+            yield ProgressBar(total=100, show_eta=False, show_percentage=True, id="plan-opus-bar")
+            yield Static("", id="plan-opus-reset", classes="plan-reset")
+
             yield Static("", id="plan-status", classes="plan-error")
 
     def update_usage(self, usage: PlanUsage) -> None:
@@ -96,19 +100,18 @@ class PlanUsagePanel(Widget):
             "#plan-7d-reset",
         )
 
-        # Use opus if available, otherwise sonnet
-        model_limit = usage.seven_day_opus or usage.seven_day_sonnet
-        if model_limit:
-            self._update_limit(
-                model_limit,
-                "#plan-sonnet-label",
-                "#plan-sonnet-bar",
-                "#plan-sonnet-reset",
-            )
-        else:
-            self.query_one("#plan-sonnet-label", Static).update("Weekly (Model)")
-            self.query_one("#plan-sonnet-bar", ProgressBar).progress = 0
-            self.query_one("#plan-sonnet-reset", Static).update("")
+        self._update_limit(
+            usage.seven_day_sonnet,
+            "#plan-sonnet-label",
+            "#plan-sonnet-bar",
+            "#plan-sonnet-reset",
+        )
+        self._update_limit(
+            usage.seven_day_opus,
+            "#plan-opus-label",
+            "#plan-opus-bar",
+            "#plan-opus-reset",
+        )
 
     def _update_limit(
         self,

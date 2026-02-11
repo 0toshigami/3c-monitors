@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import time as _time
 from datetime import datetime
+
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widget import Widget
@@ -49,6 +51,10 @@ class RateMonitor(Widget):
     RPM_LIMIT = 50  # requests per minute
     TPM_INPUT_LIMIT = 40_000  # input tokens per minute
     TPM_OUTPUT_LIMIT = 8_000  # output tokens per minute
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._last_rate_alert: float = 0.0
 
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -122,3 +128,13 @@ class RateMonitor(Widget):
 
         details.update(f"  {status}")
         details.set_classes(cls)
+
+        # Proactive notification when near limits (once per minute max)
+        now = _time.time()
+        if max_pct >= 80 and (now - self._last_rate_alert) > 60:
+            self._last_rate_alert = now
+            self.app.notify(
+                "Rate limit warning: approaching API limits!",
+                severity="warning",
+                timeout=5,
+            )

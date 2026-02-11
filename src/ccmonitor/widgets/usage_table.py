@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.widget import Widget
-from textual.widgets import DataTable, Label, Static
 from textual.containers import Vertical
+from textual.widget import Widget
+from textual.widgets import DataTable, Label
+
+from ccmonitor.collector import CACHE_PRICING, MODEL_PRICING, _get_model_family
 
 
 class UsageTable(Widget):
@@ -51,8 +53,6 @@ class UsageTable(Widget):
     ) -> None:
         table = self.query_one("#usage-dt", DataTable)
         table.clear()
-
-        from ccmonitor.collector import _get_model_family, MODEL_PRICING, CACHE_PRICING
 
         family = _get_model_family(model) if model else ""
         input_price, output_price = MODEL_PRICING.get(family, (3.0, 15.0))
