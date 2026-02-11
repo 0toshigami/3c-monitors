@@ -74,7 +74,7 @@ class PlanUsagePanel(Widget):
         status = self.query_one("#plan-status", Static)
 
         if usage.error:
-            status.update(f"  {usage.error}")
+            status.update(f"  [dim]{usage.error}[/dim]")
             return
 
         if not usage.available:

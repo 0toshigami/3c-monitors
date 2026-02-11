@@ -304,8 +304,20 @@ class PlanUsage:
 
 
 def _find_oauth_token() -> str | None:
-    """Find the Claude Code OAuth/session token."""
-    # 1. Check env var pointing to token file
+    """Find the Claude Code OAuth/session token.
+
+    Discovery order:
+    1. CCMONITOR_OAUTH_TOKEN env var (explicit override)
+    2. CLAUDE_SESSION_INGRESS_TOKEN_FILE env var (set by Claude Code)
+    3. CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR (fd passed by Claude Code)
+    4. Common token file locations on disk
+    """
+    # 1. Explicit override
+    explicit = os.environ.get("CCMONITOR_OAUTH_TOKEN")
+    if explicit:
+        return explicit.strip()
+
+    # 2. Token file env var (set by Claude Code for child processes)
     token_file = os.environ.get("CLAUDE_SESSION_INGRESS_TOKEN_FILE")
     if token_file:
         try:
@@ -313,7 +325,19 @@ def _find_oauth_token() -> str | None:
         except OSError:
             pass
 
-    # 2. Check common file locations
+    # 3. File descriptor (set by Claude Code process)
+    fd_str = os.environ.get("CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR")
+    if fd_str:
+        try:
+            fd = int(fd_str)
+            with os.fdopen(os.dup(fd), "r") as f:
+                token = f.read().strip()
+                if token:
+                    return token
+        except (ValueError, OSError):
+            pass
+
+    # 4. Common file locations
     candidates = [
         Path.home() / ".claude" / "remote" / ".session_ingress_token",
         Path("/home/claude/.claude/remote/.session_ingress_token"),
@@ -334,7 +358,10 @@ def fetch_plan_usage() -> PlanUsage:
     """Fetch subscription plan usage from the Anthropic OAuth API."""
     token = _find_oauth_token()
     if not token:
-        return PlanUsage(error="No OAuth token found")
+        return PlanUsage(
+            error="No OAuth token found — run from within a Claude Code session, "
+            "or set CCMONITOR_OAUTH_TOKEN"
+        )
 
     base_url = os.environ.get("ANTHROPIC_BASE_URL", "https://api.anthropic.com")
     url = f"{base_url}/api/oauth/usage"
