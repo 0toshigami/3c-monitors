@@ -308,9 +308,10 @@ def _find_oauth_token() -> str | None:
 
     Discovery order:
     1. CCMONITOR_OAUTH_TOKEN env var (explicit override)
-    2. CLAUDE_SESSION_INGRESS_TOKEN_FILE env var (set by Claude Code)
+    2. CLAUDE_SESSION_INGRESS_TOKEN_FILE env var (set by Claude Code remote)
     3. CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR (fd passed by Claude Code)
-    4. Common token file locations on disk
+    4. ~/.claude/.credentials.json (local Claude Code installation on Linux/WSL)
+    5. Session ingress token files (remote/container environments)
     """
     # 1. Explicit override
     explicit = os.environ.get("CCMONITOR_OAUTH_TOKEN")
@@ -337,7 +338,18 @@ def _find_oauth_token() -> str | None:
         except (ValueError, OSError):
             pass
 
-    # 4. Common file locations
+    # 4. Local credentials file (Linux/WSL plaintext storage)
+    config_dir = os.environ.get("CLAUDE_CONFIG_DIR") or str(Path.home() / ".claude")
+    creds_path = Path(config_dir) / ".credentials.json"
+    try:
+        creds = json.loads(creds_path.read_text())
+        token = creds.get("accessToken") or creds.get("access_token")
+        if token:
+            return token
+    except (OSError, json.JSONDecodeError, KeyError):
+        pass
+
+    # 5. Remote/container session ingress token files
     candidates = [
         Path.home() / ".claude" / "remote" / ".session_ingress_token",
         Path("/home/claude/.claude/remote/.session_ingress_token"),
