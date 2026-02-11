@@ -19,13 +19,12 @@ class TokenSparkline(Widget):
     DEFAULT_CSS = """
     TokenSparkline {
         height: auto;
-        padding: 1 2;
+        padding: 0 2;
     }
 
     TokenSparkline .spark-title {
         text-style: bold;
         color: $text;
-        margin-bottom: 1;
     }
 
     TokenSparkline .spark-input {
@@ -38,7 +37,6 @@ class TokenSparkline(Widget):
 
     TokenSparkline .spark-legend {
         color: $text-muted;
-        margin-top: 1;
     }
     """
 

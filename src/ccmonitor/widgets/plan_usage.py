@@ -16,17 +16,15 @@ class PlanUsagePanel(Widget):
     DEFAULT_CSS = """
     PlanUsagePanel {
         height: auto;
-        padding: 1 2;
+        padding: 0 2;
     }
 
     PlanUsagePanel .plan-title {
         text-style: bold;
         color: $text;
-        margin-bottom: 1;
     }
 
     PlanUsagePanel .plan-label {
-        margin-top: 1;
     }
 
     PlanUsagePanel .plan-reset {
@@ -47,7 +45,6 @@ class PlanUsagePanel(Widget):
 
     PlanUsagePanel .plan-error {
         color: $text-muted;
-        margin-top: 1;
     }
     """
 

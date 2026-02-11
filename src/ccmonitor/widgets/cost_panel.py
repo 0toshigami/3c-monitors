@@ -16,20 +16,18 @@ class CostPanel(Widget):
     DEFAULT_CSS = """
     CostPanel {
         height: auto;
-        padding: 1 2;
+        padding: 0 2;
     }
 
     CostPanel .cost-title {
         text-style: bold;
         color: $text;
-        margin-bottom: 1;
     }
 
     CostPanel .cost-value {
         color: $success;
         text-style: bold;
         text-align: center;
-        padding: 1 0;
     }
 
     CostPanel .cost-big {
@@ -40,7 +38,6 @@ class CostPanel(Widget):
 
     CostPanel .cost-details {
         color: $text-muted;
-        margin-top: 1;
     }
     """
 

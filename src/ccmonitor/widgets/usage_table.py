@@ -16,13 +16,12 @@ class UsageTable(Widget):
     DEFAULT_CSS = """
     UsageTable {
         height: auto;
-        padding: 1 2;
+        padding: 0 2;
     }
 
     UsageTable .usage-title {
         text-style: bold;
         color: $text;
-        margin-bottom: 1;
     }
 
     UsageTable DataTable {
