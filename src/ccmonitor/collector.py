@@ -7,6 +7,7 @@ import os
 import time
 import urllib.request
 import urllib.error
+import urllib.parse
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -303,6 +304,53 @@ class PlanUsage:
         return self.five_hour is not None or self.seven_day is not None
 
 
+_OAUTH_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
+_OAUTH_TOKEN_URL = "https://platform.claude.com/v1/oauth/token"
+
+
+def _refresh_oauth_token(refresh_token: str, creds_path: Path) -> str | None:
+    """Use a refresh_token to obtain a fresh access_token, updating the credentials file."""
+    body = urllib.parse.urlencode({
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+        "client_id": _OAUTH_CLIENT_ID,
+    }).encode()
+
+    req = urllib.request.Request(
+        _OAUTH_TOKEN_URL,
+        data=body,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError):
+        return None
+
+    access_token = data.get("access_token")
+    if not access_token:
+        return None
+
+    # Persist refreshed credentials back to disk
+    try:
+        existing = json.loads(creds_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        existing = {}
+
+    existing["access_token"] = access_token
+    if data.get("refresh_token"):
+        existing["refresh_token"] = data["refresh_token"]
+
+    try:
+        creds_path.write_text(json.dumps(existing))
+        os.chmod(creds_path, 0o600)
+    except OSError:
+        pass
+
+    return access_token
+
+
 def _find_oauth_token() -> str | None:
     """Find the Claude Code OAuth/session token.
 
@@ -310,7 +358,7 @@ def _find_oauth_token() -> str | None:
     1. CCMONITOR_OAUTH_TOKEN env var (explicit override)
     2. CLAUDE_SESSION_INGRESS_TOKEN_FILE env var (set by Claude Code remote)
     3. CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR (fd passed by Claude Code)
-    4. ~/.claude/.credentials.json (local Claude Code installation on Linux/WSL)
+    4. ~/.claude/.credentials.json (local install — refresh if expired)
     5. Session ingress token files (remote/container environments)
     """
     # 1. Explicit override
@@ -343,10 +391,15 @@ def _find_oauth_token() -> str | None:
     creds_path = Path(config_dir) / ".credentials.json"
     try:
         creds = json.loads(creds_path.read_text())
-        token = creds.get("accessToken") or creds.get("access_token")
-        if token:
-            return token
-    except (OSError, json.JSONDecodeError, KeyError):
+        # Try existing access token first
+        access = creds.get("accessToken") or creds.get("access_token")
+        if access:
+            return access
+        # No access token — try refreshing
+        refresh = creds.get("refreshToken") or creds.get("refresh_token")
+        if refresh:
+            return _refresh_oauth_token(refresh, creds_path)
+    except (OSError, json.JSONDecodeError):
         pass
 
     # 5. Remote/container session ingress token files
@@ -366,15 +419,22 @@ def _find_oauth_token() -> str | None:
     return None
 
 
-def fetch_plan_usage() -> PlanUsage:
-    """Fetch subscription plan usage from the Anthropic OAuth API."""
-    token = _find_oauth_token()
-    if not token:
-        return PlanUsage(
-            error="No OAuth token found — run from within a Claude Code session, "
-            "or set CCMONITOR_OAUTH_TOKEN"
-        )
+def _try_refresh_from_credentials() -> str | None:
+    """Attempt to refresh the token from the local credentials file."""
+    config_dir = os.environ.get("CLAUDE_CONFIG_DIR") or str(Path.home() / ".claude")
+    creds_path = Path(config_dir) / ".credentials.json"
+    try:
+        creds = json.loads(creds_path.read_text())
+        refresh = creds.get("refreshToken") or creds.get("refresh_token")
+        if refresh:
+            return _refresh_oauth_token(refresh, creds_path)
+    except (OSError, json.JSONDecodeError):
+        pass
+    return None
 
+
+def _call_usage_api(token: str) -> dict | urllib.error.HTTPError:
+    """Call the OAuth usage API, returning parsed JSON or the HTTP error."""
     base_url = os.environ.get("ANTHROPIC_BASE_URL", "https://api.anthropic.com")
     url = f"{base_url}/api/oauth/usage"
 
@@ -390,9 +450,34 @@ def fetch_plan_usage() -> PlanUsage:
 
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
-            data = json.loads(resp.read())
-    except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, OSError) as e:
-        return PlanUsage(error=str(e))
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        return e
+    except (urllib.error.URLError, json.JSONDecodeError, OSError) as e:
+        return urllib.error.HTTPError(url, 0, str(e), {}, None)
+
+
+def fetch_plan_usage() -> PlanUsage:
+    """Fetch subscription plan usage from the Anthropic OAuth API."""
+    token = _find_oauth_token()
+    if not token:
+        return PlanUsage(
+            error="No OAuth token found — run 'claude login' first, "
+            "or set CCMONITOR_OAUTH_TOKEN"
+        )
+
+    result = _call_usage_api(token)
+
+    # If 401/403, the access token is expired — try refreshing
+    if isinstance(result, urllib.error.HTTPError) and result.code in (401, 403):
+        refreshed = _try_refresh_from_credentials()
+        if refreshed:
+            result = _call_usage_api(refreshed)
+
+    if isinstance(result, urllib.error.HTTPError):
+        return PlanUsage(error=f"API error: {result.code} {result.reason}")
+
+    data = result
 
     result = PlanUsage()
 
