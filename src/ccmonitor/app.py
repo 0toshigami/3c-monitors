@@ -208,9 +208,9 @@ class ClaudeCodeMonitor(App):
 
     def on_mount(self) -> None:
         self._load_data()
-        self._refresh_timer = self.set_interval(self.refresh_interval, self._auto_refresh)
+        self._refresh_timer = self.set_interval(self.refresh_interval, self._on_refresh_timer)
 
-    def _auto_refresh(self) -> None:
+    def _on_refresh_timer(self) -> None:
         self._load_data()
 
     def _load_data(self) -> None:

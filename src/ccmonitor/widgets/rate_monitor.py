@@ -128,9 +128,9 @@ class RateMonitor(Widget):
         details.set_classes(cls)
 
         # Proactive notification when near limits (once per minute max)
-        now = _time.time()
-        if max_pct >= 80 and (now - self._last_rate_alert) > 60:
-            self._last_rate_alert = now
+        now_ts = _time.time()
+        if max_pct >= 80 and (now_ts - self._last_rate_alert) > 60:
+            self._last_rate_alert = now_ts
             self.app.notify(
                 "Rate limit warning: approaching API limits!",
                 severity="warning",

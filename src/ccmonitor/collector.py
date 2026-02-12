@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+import http.client
 import json
 import logging
 import os
@@ -361,7 +362,7 @@ def _refresh_oauth_token(refresh_token: str, creds_path: Path) -> str | None:
     except OSError:
         pass
 
-    return access_token
+    return str(access_token)
 
 
 def _find_oauth_token() -> tuple[str | None, str]:
@@ -486,11 +487,12 @@ def _call_usage_api(token: str) -> dict | urllib.error.HTTPError:
 
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
-            return json.loads(resp.read())
+            result: dict = json.loads(resp.read())
+            return result
     except urllib.error.HTTPError as e:
         return e
     except (urllib.error.URLError, json.JSONDecodeError, OSError) as e:
-        return urllib.error.HTTPError(url, 0, str(e), {}, None)
+        return urllib.error.HTTPError(url, 0, str(e), http.client.HTTPMessage(), None)
 
 
 def fetch_plan_usage() -> PlanUsage:
@@ -512,37 +514,37 @@ def fetch_plan_usage() -> PlanUsage:
 
     data = result
 
-    result = PlanUsage()
+    usage = PlanUsage()
 
     if data.get("five_hour"):
-        result.five_hour = PlanLimit(
+        usage.five_hour = PlanLimit(
             label="5-Hour Session",
             utilization=data["five_hour"].get("utilization", 0),
             resets_at=data["five_hour"].get("resets_at", ""),
         )
 
     if data.get("seven_day"):
-        result.seven_day = PlanLimit(
+        usage.seven_day = PlanLimit(
             label="Weekly (All Models)",
             utilization=data["seven_day"].get("utilization", 0),
             resets_at=data["seven_day"].get("resets_at", ""),
         )
 
     if data.get("seven_day_sonnet"):
-        result.seven_day_sonnet = PlanLimit(
+        usage.seven_day_sonnet = PlanLimit(
             label="Weekly (Sonnet)",
             utilization=data["seven_day_sonnet"].get("utilization", 0),
             resets_at=data["seven_day_sonnet"].get("resets_at", ""),
         )
 
     if data.get("seven_day_opus"):
-        result.seven_day_opus = PlanLimit(
+        usage.seven_day_opus = PlanLimit(
             label="Weekly (Opus)",
             utilization=data["seven_day_opus"].get("utilization", 0),
             resets_at=data["seven_day_opus"].get("resets_at", ""),
         )
 
-    return result
+    return usage
 
 
 def format_reset_time(resets_at: str) -> str:
