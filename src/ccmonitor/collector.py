@@ -19,10 +19,15 @@ logger = logging.getLogger(__name__)
 
 
 # Known context window sizes per model family
+# NOTE: Longer prefixes must come first so _get_model_family() matches correctly.
 MODEL_CONTEXT_WINDOWS = {
+    "claude-opus-4-6": 200_000,
+    "claude-opus-4-5": 200_000,
+    "claude-opus-4-1": 200_000,
     "claude-opus-4": 200_000,
+    "claude-sonnet-4-5": 200_000,
     "claude-sonnet-4": 200_000,
-    "claude-haiku-4": 200_000,
+    "claude-haiku-4-5": 200_000,
     "claude-3-5-sonnet": 200_000,
     "claude-3-5-haiku": 200_000,
     "claude-3-opus": 200_000,
@@ -32,9 +37,13 @@ MODEL_CONTEXT_WINDOWS = {
 
 # Pricing per million tokens (input, output) in USD
 MODEL_PRICING = {
+    "claude-opus-4-6": (5.0, 25.0),
+    "claude-opus-4-5": (5.0, 25.0),
+    "claude-opus-4-1": (15.0, 75.0),
     "claude-opus-4": (15.0, 75.0),
+    "claude-sonnet-4-5": (3.0, 15.0),
     "claude-sonnet-4": (3.0, 15.0),
-    "claude-haiku-4": (0.80, 4.0),
+    "claude-haiku-4-5": (1.0, 5.0),
     "claude-3-5-sonnet": (3.0, 15.0),
     "claude-3-5-haiku": (0.80, 4.0),
     "claude-3-opus": (15.0, 75.0),
@@ -42,11 +51,15 @@ MODEL_PRICING = {
     "claude-3-haiku": (0.25, 1.25),
 }
 
-# Cache pricing per million tokens (write, read) in USD
+# Cache pricing per million tokens (5-min write, read) in USD
 CACHE_PRICING = {
+    "claude-opus-4-6": (6.25, 0.50),
+    "claude-opus-4-5": (6.25, 0.50),
+    "claude-opus-4-1": (18.75, 1.50),
     "claude-opus-4": (18.75, 1.50),
+    "claude-sonnet-4-5": (3.75, 0.30),
     "claude-sonnet-4": (3.75, 0.30),
-    "claude-haiku-4": (1.00, 0.08),
+    "claude-haiku-4-5": (1.25, 0.10),
     "claude-3-5-sonnet": (3.75, 0.30),
     "claude-3-5-haiku": (1.00, 0.08),
     "claude-3-opus": (18.75, 1.50),

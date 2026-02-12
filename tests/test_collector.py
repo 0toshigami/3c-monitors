@@ -25,13 +25,13 @@ class TestGetModelFamily:
         assert _get_model_family("claude-opus-4") == "claude-opus-4"
 
     def test_versioned_model(self):
-        assert _get_model_family("claude-opus-4-6") == "claude-opus-4"
+        assert _get_model_family("claude-opus-4-6") == "claude-opus-4-6"
 
     def test_sonnet(self):
-        assert _get_model_family("claude-sonnet-4-5-20250929") == "claude-sonnet-4"
+        assert _get_model_family("claude-sonnet-4-5-20250929") == "claude-sonnet-4-5"
 
     def test_haiku(self):
-        assert _get_model_family("claude-haiku-4-5-20251001") == "claude-haiku-4"
+        assert _get_model_family("claude-haiku-4-5-20251001") == "claude-haiku-4-5"
 
     def test_legacy_model(self):
         assert _get_model_family("claude-3-5-sonnet-20241022") == "claude-3-5-sonnet"
