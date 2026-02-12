@@ -10,6 +10,7 @@ from textual.binding import Binding
 from textual.containers import Vertical
 from textual.message import Message
 from textual.screen import ModalScreen
+from textual.theme import Theme
 from textual.timer import Timer
 from textual.widgets import DataTable, Footer, Static
 
@@ -28,6 +29,53 @@ from ccmonitor.widgets.session_list import SessionList
 from ccmonitor.widgets.sparkline import TokenSparkline
 from ccmonitor.widgets.usage_table import UsageTable
 
+CCMONITOR_DARK = Theme(
+    name="ccmonitor-dark",
+    primary="#00D4AA",
+    secondary="#7B61FF",
+    accent="#FF6AC1",
+    warning="#FFB86C",
+    error="#FF5555",
+    success="#50FA7B",
+    foreground="#F8F8F2",
+    background="#0D1117",
+    surface="#161B22",
+    panel="#21262D",
+    dark=True,
+    variables={
+        "block-cursor-foreground": "#0D1117",
+        "block-cursor-background": "#00D4AA",
+        "footer-background": "#161B22",
+        "footer-key-foreground": "#00D4AA",
+        "footer-description-foreground": "#8B949E",
+        "border": "#30363D",
+        "border-blurred": "#21262D",
+        "scrollbar": "#30363D",
+        "scrollbar-hover": "#484F58",
+        "scrollbar-active": "#6E7681",
+    },
+)
+
+CCMONITOR_LIGHT = Theme(
+    name="ccmonitor-light",
+    primary="#0969DA",
+    secondary="#6639BA",
+    accent="#CF222E",
+    warning="#BF8700",
+    error="#CF222E",
+    success="#1A7F37",
+    foreground="#1F2328",
+    background="#FFFFFF",
+    surface="#F6F8FA",
+    panel="#EAEEF2",
+    dark=False,
+    variables={
+        "footer-key-foreground": "#0969DA",
+        "border": "#D0D7DE",
+        "border-blurred": "#EAEEF2",
+    },
+)
+
 
 class HelpScreen(ModalScreen):
     """Help overlay showing keybindings."""
@@ -43,27 +91,29 @@ class HelpScreen(ModalScreen):
     }
 
     HelpScreen > Static {
-        width: 50;
+        width: 56;
         height: auto;
         padding: 2 4;
-        border: thick $primary;
+        border: heavy $primary;
         background: $surface;
     }
     """
 
     def compose(self) -> ComposeResult:
         yield Static(
-            "[bold]Claude Code Monitor - Help[/bold]\n"
+            "[bold $primary]\u25b6 Keyboard Shortcuts[/]\n"
             "\n"
-            "  [bold]Key         Action[/bold]\n"
-            "  q           Quit\n"
-            "  r           Refresh data now\n"
-            "  j / k       Navigate sessions\n"
-            "  d           Toggle dark/light mode\n"
-            "  ?           Show/close this help\n"
-            "  Esc         Close this overlay\n"
+            "  [bold $primary]Key[/]         [bold]Action[/]\n"
+            "  [dim]\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
+            "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500[/]\n"
+            "  [bold]q[/]           Quit\n"
+            "  [bold]r[/]           Refresh data now\n"
+            "  [bold]j[/] / [bold]k[/]       Navigate sessions\n"
+            "  [bold]d[/]           Toggle dark/light mode\n"
+            "  [bold]?[/]           Show/close this help\n"
+            "  [bold]Esc[/]         Close this overlay\n"
             "\n"
-            "  [bold]Session Filter[/bold]\n"
+            "[bold $primary]\u25b6 Session Filter[/]\n"
             "  Type in the filter box to search\n"
             "  sessions by project name or model.\n"
         )
@@ -81,34 +131,34 @@ class ClaudeCodeMonitor(App):
         grid-size: 3 3;
         grid-columns: 1fr 2fr 1fr;
         grid-rows: auto 1fr auto;
-        grid-gutter: 1;
+        grid-gutter: 0 1;
     }
 
     #header-bar {
         column-span: 3;
         height: 3;
-        background: $primary-background;
+        background: $surface;
         color: $text;
         content-align: center middle;
-        text-style: bold;
         padding: 1 2;
+        border-bottom: heavy $primary;
     }
 
     #sidebar-left {
         row-span: 1;
-        border: solid $primary;
+        border: round $primary 50%;
         height: 1fr;
     }
 
     #main-area {
         row-span: 1;
-        border: solid $primary;
+        border: heavy $primary;
         height: 1fr;
     }
 
     #sidebar-right {
         row-span: 1;
-        border: solid $primary;
+        border: round $primary 50%;
         height: 1fr;
     }
 
@@ -119,12 +169,12 @@ class ClaudeCodeMonitor(App):
 
     #ctx-gauge-box {
         height: 1fr;
-        border-bottom: solid $primary;
+        border-bottom: dashed $primary 30%;
     }
 
     #usage-table-box {
         height: 1fr;
-        border-bottom: solid $primary;
+        border-bottom: dashed $primary 30%;
     }
 
     #spark-box {
@@ -133,12 +183,12 @@ class ClaudeCodeMonitor(App):
 
     #plan-box {
         height: 1fr;
-        border-bottom: solid $primary;
+        border-bottom: dashed $primary 30%;
     }
 
     #rate-box {
         height: 1fr;
-        border-bottom: solid $primary;
+        border-bottom: dashed $primary 30%;
     }
 
     #cost-box {
@@ -148,9 +198,10 @@ class ClaudeCodeMonitor(App):
     #status-line {
         dock: bottom;
         height: 1;
-        background: $primary;
+        background: $surface;
         color: $text;
         padding: 0 2;
+        border-top: solid $primary 30%;
     }
     """
 
@@ -177,10 +228,18 @@ class ClaudeCodeMonitor(App):
         self._sessions: list[SessionData] = []
         self._selected_idx: int = 0
         self._refresh_timer: Timer | None = None
+        self._pulse_state: bool = False
+        self.register_theme(CCMONITOR_DARK)
+        self.register_theme(CCMONITOR_LIGHT)
+        self.theme = "ccmonitor-dark"
 
     def compose(self) -> ComposeResult:
         yield Static(
-            " Claude Code Monitor  |  Real-time Context & Usage Tracking",
+            "[bold #00D4AA]  cc[/][bold]monitor[/]"
+            "  [dim #8B949E]\u2502[/]"
+            "  [#8B949E]Real-time Context & Usage Tracking[/]"
+            "  [dim #8B949E]\u2502[/]"
+            "  [bold #50FA7B]\u25cf[/] [dim]LIVE[/]",
             id="header-bar",
         )
 
@@ -212,6 +271,7 @@ class ClaudeCodeMonitor(App):
 
     def _on_refresh_timer(self) -> None:
         self._load_data()
+        self._pulse_header()
 
     def _load_data(self) -> None:
         """Load/reload all session data and update widgets."""
@@ -255,10 +315,13 @@ class ClaudeCodeMonitor(App):
         # Update status line
         status = self.query_one("#status-line", Static)
         status.update(
-            f" {len(self._sessions)} sessions  |  "
-            f"{summary.total_tokens:,} total tokens  |  "
-            f"${summary.total_cost_usd:.4f}  |  "
-            f"Auto-refresh: {self.refresh_interval}s"
+            f" [bold]{len(self._sessions)}[/] sessions"
+            f"  [dim]\u2502[/]  "
+            f"[bold]{summary.total_tokens:,}[/] [dim]tokens[/]"
+            f"  [dim]\u2502[/]  "
+            f"[bold $success]${summary.total_cost_usd:.4f}[/]"
+            f"  [dim]\u2502[/]  "
+            f"[dim]\u21bb {self.refresh_interval}s[/]"
         )
 
     def _update_session_view(self, session: SessionData) -> None:
@@ -314,10 +377,24 @@ class ClaudeCodeMonitor(App):
             table.move_cursor(row=self._selected_idx)
 
     def action_toggle_dark(self) -> None:
-        self.theme = "textual-light" if self.theme == "textual-dark" else "textual-dark"
+        self.theme = "ccmonitor-light" if self.theme == "ccmonitor-dark" else "ccmonitor-dark"
 
     def action_show_help(self) -> None:
         self.push_screen(HelpScreen())
+
+    def _pulse_header(self) -> None:
+        """Alternate the live indicator dot for a heartbeat effect."""
+        self._pulse_state = not self._pulse_state
+        dot = "\u25cf" if self._pulse_state else "\u25cb"
+        color = "#50FA7B" if self._pulse_state else "#30363D"
+        header = self.query_one("#header-bar", Static)
+        header.update(
+            f"[bold #00D4AA]  cc[/][bold]monitor[/]"
+            f"  [dim #8B949E]\u2502[/]"
+            f"  [#8B949E]Real-time Context & Usage Tracking[/]"
+            f"  [dim #8B949E]\u2502[/]"
+            f"  [bold {color}]{dot}[/] [dim]LIVE[/]"
+        )
 
     @work(thread=True, exclusive=True, group="plan_usage")
     def _fetch_plan_usage_async(self) -> None:

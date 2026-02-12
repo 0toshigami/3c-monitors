@@ -8,9 +8,10 @@ from datetime import datetime
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widget import Widget
-from textual.widgets import Label, ProgressBar, Static
+from textual.widgets import Label, Static
 
 from ccmonitor.collector import MessageStats
+from ccmonitor.widgets.styled_bar import StyledBar
 
 
 class RateMonitor(Widget):
@@ -56,26 +57,26 @@ class RateMonitor(Widget):
 
     def compose(self) -> ComposeResult:
         with Vertical():
-            yield Label("Rate Limits", classes="rate-title")
+            yield Label("[bold $primary]\u25b6[/] [bold]Rate Limits[/]", classes="rate-title")
             yield Static("Requests/min", id="rpm-label")
-            yield ProgressBar(total=100, show_eta=False, show_percentage=True, id="rpm-bar")
+            yield StyledBar(id="rpm-bar")
             yield Static("Input tokens/min", id="tpm-in-label")
-            yield ProgressBar(total=100, show_eta=False, show_percentage=True, id="tpm-in-bar")
+            yield StyledBar(id="tpm-in-bar")
             yield Static("Output tokens/min", id="tpm-out-label")
-            yield ProgressBar(total=100, show_eta=False, show_percentage=True, id="tpm-out-bar")
+            yield StyledBar(id="tpm-out-bar")
             yield Static("", id="rate-details", classes="rate-details")
 
     def update_rates(self, messages: list[MessageStats]) -> None:
         """Calculate current rates from recent messages."""
-        rpm_bar = self.query_one("#rpm-bar", ProgressBar)
-        tpm_in_bar = self.query_one("#tpm-in-bar", ProgressBar)
-        tpm_out_bar = self.query_one("#tpm-out-bar", ProgressBar)
+        rpm_bar = self.query_one("#rpm-bar", StyledBar)
+        tpm_in_bar = self.query_one("#tpm-in-bar", StyledBar)
+        tpm_out_bar = self.query_one("#tpm-out-bar", StyledBar)
         details = self.query_one("#rate-details", Static)
 
         if not messages:
-            rpm_bar.progress = 0
-            tpm_in_bar.progress = 0
-            tpm_out_bar.progress = 0
+            rpm_bar.percentage = 0
+            tpm_in_bar.percentage = 0
+            tpm_out_bar.percentage = 0
             details.update("  No recent activity")
             return
 
@@ -100,9 +101,9 @@ class RateMonitor(Widget):
         tpm_in_pct = min(100, (tpm_in / self.TPM_INPUT_LIMIT) * 100)
         tpm_out_pct = min(100, (tpm_out / self.TPM_OUTPUT_LIMIT) * 100)
 
-        rpm_bar.progress = rpm_pct
-        tpm_in_bar.progress = tpm_in_pct
-        tpm_out_bar.progress = tpm_out_pct
+        rpm_bar.percentage = rpm_pct
+        tpm_in_bar.percentage = tpm_in_pct
+        tpm_out_bar.percentage = tpm_out_pct
 
         # Update labels with current values
         rpm_label = self.query_one("#rpm-label", Static)
@@ -115,13 +116,13 @@ class RateMonitor(Widget):
 
         max_pct = max(rpm_pct, tpm_in_pct, tpm_out_pct)
         if max_pct >= 80:
-            status = "NEAR LIMIT - May experience throttling"
+            status = "[bold #FF5555]\u26a0 NEAR LIMIT[/] - May experience throttling"
             cls = "rate-details rate-danger"
         elif max_pct >= 50:
-            status = "Moderate usage"
+            status = "[#FFB86C]\u25b2 Moderate[/] usage"
             cls = "rate-details rate-warn"
         else:
-            status = "Within limits"
+            status = "[#50FA7B]\u2713 Within[/] limits"
             cls = "rate-details rate-ok"
 
         details.update(f"  {status}")

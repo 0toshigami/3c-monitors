@@ -31,7 +31,7 @@ class UsageTable(Widget):
 
     def compose(self) -> ComposeResult:
         with Vertical():
-            yield Label("Token Usage Breakdown", classes="usage-title")
+            yield Label("[bold $primary]\u25b6[/] [bold]Token Breakdown[/]", classes="usage-title")
             yield DataTable(id="usage-dt")
 
     def on_mount(self) -> None:
@@ -68,8 +68,8 @@ class UsageTable(Widget):
             ("Output", f"{output_tokens:,}", f"${output_cost:.4f}"),
             ("Cache Write", f"{cache_creation:,}", f"${cache_write_cost:.4f}"),
             ("Cache Read", f"{cache_read:,}", f"${cache_read_cost:.4f}"),
-            ("", "", ""),
-            ("TOTAL", f"{total_tokens:,}", f"${cost:.4f}"),
+            ("\u2500" * 11, "\u2500" * 12, "\u2500" * 10),
+            ("[bold]TOTAL[/]", f"[bold]{total_tokens:,}[/]", f"[bold $success]${cost:.4f}[/]"),
         ]
 
         for row in rows:
