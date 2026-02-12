@@ -2,8 +2,7 @@
 
 A terminal UI (TUI) for real-time monitoring of [Claude Code](https://docs.anthropic.com/en/docs/claude-code) context window usage, token consumption, costs, and subscription plan limits.
 
-<!-- TODO: Add a screenshot or GIF here -->
-<!-- ![ccmonitor screenshot](docs/screenshot.png) -->
+![ccmonitor screenshot](docs/screenshot.png)
 
 ## Features
 
@@ -23,26 +22,33 @@ A terminal UI (TUI) for real-time monitoring of [Claude Code](https://docs.anthr
 - Python 3.10+
 - An existing [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installation (this tool reads its session data)
 
+## Quick Start
+
+```bash
+git clone https://github.com/0toshigami/3c-monitors.git
+cd 3c-monitors
+uv run ccmonitor
+```
+
+No installation needed — `uv run` handles dependencies automatically.
+
 ## Installation
+
+If you prefer a persistent install:
 
 ### Using uv (recommended)
 
 ```bash
-# Clone the repo
-git clone https://github.com/0toshigami/3c-monitors.git
-cd 3c-monitors
-
-# Install in a virtual environment
 uv venv
 uv pip install -e .
+ccmonitor
 ```
 
 ### Using pip
 
 ```bash
-git clone https://github.com/0toshigami/3c-monitors.git
-cd 3c-monitors
 pip install -e .
+ccmonitor
 ```
 
 ## Usage
