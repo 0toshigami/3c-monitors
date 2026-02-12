@@ -181,8 +181,8 @@ def discover_sessions(claude_dir: Path | None = None) -> list[Path]:
             continue
         sessions.append(jsonl_file)
 
-    # Sort by modification time, newest first
-    sessions.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    # Sort by modification time, newest first; skip files deleted during discovery
+    sessions.sort(key=lambda p: p.stat().st_mtime if p.exists() else 0, reverse=True)
     return sessions
 
 
@@ -268,7 +268,11 @@ def collect_all_sessions(claude_dir: Path | None = None) -> list[SessionData]:
     paths = discover_sessions(claude_dir)
     sessions = []
     for path in paths:
-        session = parse_session(path)
+        try:
+            session = parse_session(path)
+        except FileNotFoundError:
+            logger.debug("Session file vanished during collection: %s", path)
+            continue
         sessions.append(session)
     return sessions
 
