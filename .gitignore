@@ -10,3 +10,5 @@ build/
 venv/
 .env
 .python-version
+.pytest_cache/
+.mypy_cache/

@@ -2,10 +2,18 @@
 name = "ccmonitor"
 version = "0.1.0"
 description = "TUI for real-time monitoring of Claude Code context and usage limits"
+license = "MIT"
 requires-python = ">=3.10"
 dependencies = [
     "textual>=1.0.0",
     "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.8.0",
+    "mypy>=1.13",
 ]
 
 [project.scripts]
@@ -36,6 +44,9 @@ select = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["ccmonitor"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.mypy]
 python_version = "3.10"
