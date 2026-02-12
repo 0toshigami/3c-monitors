@@ -7,7 +7,9 @@ from textual.containers import Vertical
 from textual.css.query import NoMatches
 from textual.reactive import reactive
 from textual.widget import Widget
-from textual.widgets import Label, ProgressBar, Static
+from textual.widgets import Label, Static
+
+from ccmonitor.widgets.styled_bar import StyledBar
 
 
 class ContextGauge(Widget):
@@ -24,7 +26,7 @@ class ContextGauge(Widget):
         color: $text;
     }
 
-    ContextGauge .gauge-bar {
+    ContextGauge StyledBar {
         margin: 0 0 0 0;
     }
 
@@ -49,8 +51,8 @@ class ContextGauge(Widget):
 
     def compose(self) -> ComposeResult:
         with Vertical():
-            yield Label("Context Window Usage", classes="gauge-title")
-            yield ProgressBar(total=100, show_eta=False, show_percentage=True, id="ctx-bar")
+            yield Label("[bold $primary]\u25b6[/] [bold]Context Window[/]", classes="gauge-title")
+            yield StyledBar(id="ctx-bar")
             yield Static("", id="ctx-details")
 
     def watch_context_used(self) -> None:
@@ -64,14 +66,14 @@ class ContextGauge(Widget):
 
     def _update_display(self) -> None:
         try:
-            bar = self.query_one("#ctx-bar", ProgressBar)
+            bar = self.query_one("#ctx-bar", StyledBar)
             details = self.query_one("#ctx-details", Static)
         except NoMatches:
             return
 
         pct = (self.context_used / self.context_total * 100) if self.context_total > 0 else 0
         pct = min(100.0, pct)
-        bar.progress = pct
+        bar.percentage = pct
 
         used_k = self.context_used / 1000
         total_k = self.context_total / 1000
@@ -81,12 +83,13 @@ class ContextGauge(Widget):
 
         status = ""
         if pct >= 90:
-            status = "  [CRITICAL]"
+            status = "  [bold #FF5555]\u26a0 CRITICAL[/]"
             details.set_classes("gauge-details gauge-danger")
         elif pct >= 70:
-            status = "  [WARNING]"
+            status = "  [bold #FFB86C]\u25b2 WARNING[/]"
             details.set_classes("gauge-details gauge-warning")
         else:
+            status = "  [#50FA7B]\u2713 OK[/]"
             details.set_classes("gauge-details")
 
         details.update(

@@ -10,7 +10,22 @@ from textual.widgets import Label, Static
 from ccmonitor.collector import MessageStats
 
 # Unicode block characters for bar rendering
-BLOCKS = " ▁▂▃▄▅▆▇█"
+BLOCKS = " \u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588"
+
+# Color gradients for sparklines (threshold, hex_color)
+INPUT_GRADIENT: list[tuple[float, str]] = [
+    (0.0, "#30363D"),
+    (0.15, "#00D4AA"),
+    (0.6, "#FFB86C"),
+    (0.85, "#FF6AC1"),
+]
+
+OUTPUT_GRADIENT: list[tuple[float, str]] = [
+    (0.0, "#30363D"),
+    (0.15, "#7B61FF"),
+    (0.6, "#FF79C6"),
+    (0.85, "#FF5555"),
+]
 
 
 class TokenSparkline(Widget):
@@ -28,11 +43,9 @@ class TokenSparkline(Widget):
     }
 
     TokenSparkline .spark-input {
-        color: $primary;
     }
 
     TokenSparkline .spark-output {
-        color: $success;
     }
 
     TokenSparkline .spark-legend {
@@ -50,7 +63,7 @@ class TokenSparkline(Widget):
 
     def compose(self) -> ComposeResult:
         with Vertical():
-            yield Label("Token Usage Over Time", classes="spark-title")
+            yield Label("[bold $primary]\u25b6[/] [bold]Token History[/]", classes="spark-title")
             yield Static("", id="spark-input", classes="spark-input")
             yield Static("", id="spark-output", classes="spark-output")
             yield Static("", id="spark-legend", classes="spark-legend")
@@ -62,7 +75,7 @@ class TokenSparkline(Widget):
         legend = self.query_one("#spark-legend", Static)
 
         if not messages:
-            input_label.update("  No data yet")
+            input_label.update("  [dim]No data yet[/]")
             output_label.update("")
             legend.update("")
             return
@@ -77,8 +90,8 @@ class TokenSparkline(Widget):
         input_vals = _downsample(input_vals, width)
         output_vals = _downsample(output_vals, width)
 
-        input_spark = "  IN  " + _render_sparkline(input_vals)
-        output_spark = "  OUT " + _render_sparkline(output_vals)
+        input_spark = "  [bold #00D4AA]IN [/] " + _render_sparkline(input_vals, INPUT_GRADIENT)
+        output_spark = "  [bold #7B61FF]OUT[/] " + _render_sparkline(output_vals, OUTPUT_GRADIENT)
 
         input_label.update(input_spark)
         output_label.update(output_spark)
@@ -86,24 +99,41 @@ class TokenSparkline(Widget):
         max_in = max(input_vals) if input_vals else 0
         max_out = max(output_vals) if output_vals else 0
         legend.update(
-            f"  IN peak: {max_in:,} tokens  |  OUT peak: {max_out:,} tokens  |  "
-            f"{len(messages)} API calls"
+            f"  [#00D4AA]\u25a0[/] IN peak: {max_in:,}"
+            f"  [#7B61FF]\u25a0[/] OUT peak: {max_out:,}"
+            f"  [dim]{len(messages)} calls[/]"
         )
 
 
-def _render_sparkline(values: list[int]) -> str:
-    """Render a list of values as a sparkline string."""
+def _render_sparkline(
+    values: list[int],
+    gradient: list[tuple[float, str]] | None = None,
+) -> str:
+    """Render a list of values as a colorized sparkline string using Rich markup."""
     if not values:
         return ""
     max_val = max(values)
     if max_val == 0:
-        return BLOCKS[0] * len(values)
+        color = gradient[0][1] if gradient else "#30363D"
+        return f"[{color}]" + BLOCKS[0] * len(values) + "[/]"
+
+    if gradient is None:
+        gradient = INPUT_GRADIENT
 
     result = []
     for v in values:
-        idx = int((v / max_val) * (len(BLOCKS) - 1))
+        ratio = v / max_val
+        idx = int(ratio * (len(BLOCKS) - 1))
         idx = min(idx, len(BLOCKS) - 1)
-        result.append(BLOCKS[idx])
+
+        # Pick color from gradient based on value ratio
+        color = gradient[0][1]
+        for threshold, c in gradient:
+            if ratio >= threshold:
+                color = c
+
+        result.append(f"[{color}]{BLOCKS[idx]}[/]")
+
     return "".join(result)
 
 

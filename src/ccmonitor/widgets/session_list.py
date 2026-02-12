@@ -53,7 +53,7 @@ class SessionList(Widget):
 
     def compose(self) -> ComposeResult:
         with Vertical():
-            yield Label("Sessions (* = active)", classes="session-title")
+            yield Label("[bold $primary]\u25b6[/] [bold]Sessions[/]", classes="session-title")
             yield Input(placeholder="Filter sessions...", id="session-filter")
             yield DataTable(id="session-dt")
 
@@ -100,8 +100,7 @@ class SessionList(Widget):
 
             # Active session indicator
             is_active = session.file_mtime and (now - session.file_mtime) < 3600
-            if is_active:
-                project = f"*{project}"
+            project = f"\u25cf {project}" if is_active else f"\u25cb {project}"
 
             model = session.model
             if model:
